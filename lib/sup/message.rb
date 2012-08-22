@@ -41,9 +41,11 @@ class Message
               :cc, :bcc, :labels, :attachments, :list_address, :recipient_email, :replyto,
               :list_subscribe, :list_unsubscribe
 
-  bool_reader :dirty, :source_marked_read, :snippet_contains_encrypted_content
+  bool_reader :source_marked_read, :snippet_contains_encrypted_content
 
   attr_accessor :locations
+
+  def dirty?; @dirty || wrong_source?; end
 
   ## if you specify a :header, will use values from that. otherwise,
   ## will try and load the header from the source.
@@ -289,6 +291,10 @@ EOS
 
   def each_raw_message_line &b
     location.each_raw_message_line &b
+  end
+
+  def wrong_source?
+    $config[:sync_back_to_maildir] and @locations.any? { |l| l.valid? and l.source.is_a? Maildir and l.wrong_source? @labels}
   end
 
   def sync_back
@@ -734,8 +740,10 @@ class Location
     synced = false
     return synced unless sync_back_enabled? and valid?
     source.synchronize do
-      new_info = source.sync_back(@info, labels)
-      if new_info
+      pair = source.sync_back(@info, labels)
+      if pair
+        new_source, new_info = pair
+        @source = new_source if new_source
         @info = new_info
         Index.sync_message message, true
         synced = true
@@ -746,6 +754,10 @@ class Location
 
   def sync_back_enabled?
     source.respond_to? :sync_back and $config[:sync_back_to_maildir] and source.sync_back_enabled?
+  end
+
+  def wrong_source? labels
+    source.wrong_source? labels if source.respond_to? :wrong_source
   end
 
   ## much faster than raw_message

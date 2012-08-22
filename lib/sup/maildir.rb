@@ -96,11 +96,25 @@ class Maildir < Source
     with_file_for(id) { |f| RMail::Parser.read f }
   end
 
+  def wrong_source? labels
+    new_source = nil
+    $config[:maildir_labels].each do |k,v|
+      v.each do |lbl,i|
+        if lbl.nil? or labels.member? lbl
+          new_source = i
+          break
+        end
+      end if v.any? { |lbl,i| i == @id }
+    end if $config[:maildir_labels]
+    new_source
+  end
+
   def sync_back id, labels
     synchronize do
       debug "syncing back maildir message #{id} with flags #{labels.to_a}"
+      new_source = (wrong_source? labels) || @id
       flags = maildir_reconcile_flags id, labels
-      maildir_mark_file id, flags
+      maildir_move_file id, new_source, flags
     end
   end
 
@@ -244,16 +258,18 @@ private
       new_flags.to_a.sort.join
   end
 
-  def maildir_mark_file orig_path, flags
+  def maildir_move_file orig_path, new_source_id, flags
     @mutex.synchronize do
       new_base = (flags.include?("S")) ? "cur" : "new"
       md_base, md_ver, md_flags = maildir_data orig_path
 
-      return if md_flags == flags
+      return if md_flags == flags and new_source_id == @id
+
+      new_source = SourceManager[new_source_id]
 
       new_loc = File.join new_base, "#{md_base}:#{md_ver},#{flags}"
       orig_path = File.join @dir, orig_path
-      new_path  = File.join @dir, new_loc
+      new_path  = File.join new_source.file_path, new_loc
       tmp_path  = File.join @dir, "tmp", "#{md_base}:#{md_ver},#{flags}"
 
       File.safe_link orig_path, tmp_path
@@ -261,7 +277,7 @@ private
       File.safe_link tmp_path, new_path
       File.unlink tmp_path
 
-      new_loc
+      [new_source, new_loc]
     end
   end
 end
