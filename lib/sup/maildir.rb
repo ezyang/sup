@@ -277,6 +277,20 @@ private
       File.safe_link tmp_path, new_path
       File.unlink tmp_path
 
+      if new_source_id != @id
+          Dir.mkdir(File.join @dir, "mvtmp") if not File.directory?(File.join @dir, "mvtmp")
+          Dir.mkdir(File.join @dir, "mv") if not File.directory?(File.join @dir, "mv")
+
+          mvtmp_path = File.join @dir, "mvtmp", "#{md_base}:#{md_ver},#{flags}"
+          mv_path = File.join @dir, "mv", "#{md_base}:#{md_ver},#{flags}"
+
+          File.open(mvtmp_path, "w") do |f|
+              f.write(new_path)
+              f.fsync
+          end
+          File.rename mvtmp_path, mv_path
+      end
+
       [new_source, new_loc]
     end
   end
