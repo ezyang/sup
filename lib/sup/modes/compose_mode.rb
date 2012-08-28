@@ -3,9 +3,20 @@
 module Redwood
 
 class ComposeMode < EditMessageMode
+
+  HookManager.register "compose-from", <<EOS
+Selects a default address for the From: header of a new message
+being composed.
+Variables:
+  opts: a dictionary of ComposeMode options, including :from, :to,
+    :cc, :bcc, :subject, :refs and :replytos
+Return value:
+  A Person to be used as the default for the From: header
+EOS
+
   def initialize opts={}
     header = {}
-    header["From"] = (opts[:from] || AccountManager.default_account).full_address
+    header["From"] = (opts[:from] || HookManager.run("compose-from", :opts => opts) || AccountManager.default_account).full_address
     header["To"] = opts[:to].map { |p| p.full_address }.join(", ") if opts[:to]
     header["Cc"] = opts[:cc].map { |p| p.full_address }.join(", ") if opts[:cc]
     header["Bcc"] = opts[:bcc].map { |p| p.full_address }.join(", ") if opts[:bcc]
