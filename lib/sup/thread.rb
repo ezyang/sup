@@ -65,6 +65,7 @@ class Thread
     if root
       adj = 1
       root.first_useful_descendant.each_with_stuff do |c, d, par|
+        next if c.message and c.message.has_label? :draft and c.message.has_label? :deleted
         yield c.message, d, (par ? par.message : nil)
       end
     elsif @containers.length > 1 && fake_root
@@ -78,6 +79,7 @@ class Thread
       fud.each_with_stuff do |c, d, par|
         ## special case here: if we're an empty root that's already
         ## been joined by a fake root, don't emit
+        next if c.message and c.message.has_label? :draft and c.message.has_label? :deleted
         yield c.message, d + adj, (par ? par.message : nil) unless
           fake_root && c.message.nil? && root.nil? && c == fud
       end
@@ -112,7 +114,7 @@ class Thread
   end
 
   def set_labels l; each { |m, *o| m && m.labels = l }; end
-  def has_label? t; any? { |m, *o| m && m.has_label?(t) }; end
+  def has_label? t; any? { |m, *o| m && (t == :draft || !m.has_label?(:draft)) && !m.has_label?(:deleted) && m.has_label?(t) }; end
   def each_dirty_message; each { |m, *o| m && m.dirty? && yield(m) }; end
 
   def direct_participants
@@ -125,7 +127,7 @@ class Thread
 
   def size; map { |m, *o| m ? 1 : 0 }.sum; end
   def subj; argfind { |m, *o| m && m.subj }; end
-  def labels; inject(Set.new) { |s, (m, *o)| m ? s | m.labels : s } end
+  def labels; inject(Set.new) { |s, (m, *o)| (m && !m.has_label?(:draft)) ? s | m.labels : s } end
   def labels= l
     raise ArgumentError, "not a set" unless l.is_a?(Set)
     each { |m, *o| m && m.labels = l.dup }
