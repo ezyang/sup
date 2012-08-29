@@ -524,7 +524,7 @@ protected
   end
 
   def save_as_draft
-    DraftManager.write_draft { |f| write_message f, false }
+    DraftManager.write_draft(Person.from_address(@header["From"]).email) { |f| write_message f, false }
     BufferManager.kill_buffer buffer
     BufferManager.flash "Saved for later editing."
   end

@@ -26,7 +26,7 @@ class ResumeMode < EditMessageMode
       true
     when false
       if edited?
-        DraftManager.write_draft { |f| write_message f, false }
+        DraftManager.write_draft(Person.from_address(@header["From"]).email) { |f| write_message f, false }
         DraftManager.discard @m
         BufferManager.flash "Draft saved."
       end
@@ -44,8 +44,10 @@ class ResumeMode < EditMessageMode
   end
 
   def save_as_draft
-    @safe = true
-    DraftManager.discard @m if super
+    DraftManager.write_draft(Person.from_address(@header["From"]).email) { |f| write_message f, false }
+    DraftManager.discard @m
+    BufferManager.kill_buffer buffer
+    BufferManager.flash "Saved for later editing."
   end
 end
 

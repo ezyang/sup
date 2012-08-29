@@ -1,6 +1,15 @@
 module Redwood
 
 class DraftManager
+
+  HookManager.register "draft-save-to", <<EOS
+Selects a source to save a draft to.
+Variables:
+  from_email: the email part of the From: line, or nil if empty
+Return value:
+  A source to save the draft to.
+EOS
+
   include Singleton
 
   attr_accessor :source
@@ -13,17 +22,29 @@ class DraftManager
   def self.source_id; 9999; end
   def new_source; @source = DraftLoader.new; end
 
-  def write_draft
-    offset = @source.gen_offset
-    fn = @source.fn_for_offset offset
-    File.open(fn, "w") { |f| yield f }
-    PollManager.poll_from @source
+  def write_draft from_email
+    source = HookManager.run("draft-save-to", :from_email => from_email) || @source
+    source = @source unless source.respond_to? :store_draft
+    if source.id.to_i == DraftManager.source_id
+      offset = source.gen_offset
+      fn = source.fn_for_offset offset
+      File.open(fn, "w") { |f| yield f }
+    elsif
+      date = Time.now
+      source.store_draft(date, from_email) { |f| yield f }
+    end
+    PollManager.poll_from source
   end
 
   def discard m
-    raise ArgumentError, "not a draft: source id #{m.source.id.inspect}, should be #{DraftManager.source_id.inspect} for #{m.id.inspect}" unless m.source.id.to_i == DraftManager.source_id
-    Index.delete m.id
-    File.delete @source.fn_for_offset(m.source_info) rescue Errono::ENOENT
+    raise ArgumentError, "not a draft: source id #{m.source.id.inspect}, should be #{DraftManager.source_id.inspect} for #{m.id.inspect}" unless m.source.respond_to? :fn_for_offset
+    if m.source.id.to_i == DraftManager.source_id
+      Index.delete m.id
+      File.delete @source.fn_for_offset(m.source_info) rescue Errno::ENOENT
+    else
+      m.add_label :deleted
+      Index.update_message m
+    end
     UpdateManager.relay self, :single_message_deleted, m
   end
 end

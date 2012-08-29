@@ -40,9 +40,21 @@ class Maildir < Source
     @sync_back
   end
 
+  def store_draft date, from_email, &block
+    store_message_helper date, from_email, 'DS', &block
+  end
+
   def store_message date, from_email, &block
+    store_message_helper date, from_email, 'S', &block
+  end
+
+  def fn_for_offset id
+    return File.join(@dir, id)
+  end
+
+  def store_message_helper date, from_email, labelstring, &block
     stored = false
-    new_fn = new_maildir_basefn + ':2,S'
+    new_fn = new_maildir_basefn + ':2,' + labelstring
     Dir.chdir(@dir) do |d|
       tmp_path = File.join(@dir, 'tmp', new_fn)
       new_path = File.join(@dir, 'new', new_fn)
