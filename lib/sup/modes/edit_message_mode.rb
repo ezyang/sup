@@ -157,7 +157,7 @@ EOS
     end
 
     @crypto_selector =
-      if CryptoManager.have_crypto?
+      if CryptoManager.have_crypto? and false
         HorizontalSelector.new "Crypto:", [:none] + CryptoManager::OUTGOING_MESSAGE_OPERATIONS.keys, ["None"] + CryptoManager::OUTGOING_MESSAGE_OPERATIONS.values
       end
     add_selector @crypto_selector if @crypto_selector
