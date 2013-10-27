@@ -210,7 +210,7 @@ EOS
             m.labels.each { |l| LabelManager << l }
             m.labels = old_m.labels + (m.labels - [:unread, :inbox]) if old_m
             m.locations = old_m.locations + m.locations if old_m
-            HookManager.run "before-add-message", :message => m
+            HookManager.run "before-add-message", :message => m if not old_m
             yield :add, m, old_m, args[:progress] if block_given?
             Index.sync_message m, true
 
